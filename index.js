@@ -1,35 +1,50 @@
-const { XMLParser } = require("fast-xml-parser")
-const fs = require("fs")
-options = {
-  preserveOrder:true,
+const https = require('https');
+const { XMLParser } = require("fast-xml-parser");
+const { parse } = require('path');
+
+/**
+ * Pass the data to send as `event.data`, and the request options as
+ * `event.options`. For more information see the HTTPS module documentation
+ * at https://nodejs.org/api/https.html.
+ *
+ * Will succeed with the response body.
+ */
+exports.handler = (event, context, callback) => {
+https.get(event['sort-key']["S"], (res) => {
+  console.log('statusCode:', res.statusCode);
+  console.log('headers:', res.headers);
+  let rawData = '';
+  res.on('data', (d) => {
+    rawData += d;
+  });
+   res.on('end', () => {
+      const articlesArr = parseXML(rawData)
+      callback(null, articlesArr);
+  });
+
+}).on('error', (e) => {
+  callback(e);
+});
+
+};
+
+
+function parseXML(data){
+  const options = {
+  //preserveOrder:true,
   ignoreAttributes:true,
   ignoreDeclaration:true,
   ignorePiTags:true,
-}
-const parser = new XMLParser()
-fs.readFile("./pubmed-api-response-limit-50.txt", "utf8", function(err, data){
-   if(err){
-    console.log(err)
-  }else{
-    // let fullXML = parser.parse(data)
-   // let content = jObj.rss.channel.item[1]["content:encoded"]
-    let jContent = parser.parse(data)
-    //console.log(jContent.rss.channel.item)
-    const portionOfXMLWithAbstract = jContent.rss.channel.item[0].description
-    console.log(portionOfXMLWithAbstract)
-    console.log(portionOfXMLWithAbstract[portionOfXMLWithAbstract.length - 1]["#text"])
-
-    const singleArticle = jContent.rss.channel.item[0]
-    let article = new Article(singleArticle)
-    //function getId(sourceArr, identifier){
-      //fullId = sourceArr.find(a => a.startsWith(identifier))
-      //idWithoutIdentifier = fullId.slice(identifier.length + 1)
-      //return idWithoutIdentifier
-    //}
-    //console.log(getId(singleArticle['dc:identifier'], 'doi'))
-    console.log(article)
   }
-})
+  const parser = new XMLParser(options)
+  let resArr = []
+  const fullParsedData = parser.parse(data)
+  //return fullParsedData[0].rss[0]
+  const rawArticlesArr = fullParsedData.rss.channel.item
+  rawArticlesArr.forEach((a) => resArr.push(new Article(a)))
+  return resArr
+  
+}
 
 class Article{
   constructor(data){
@@ -48,4 +63,4 @@ class Article{
       return idWithoutIdentifier
   }
 }
-//let jObj = parser.parse(XMLdata)
+

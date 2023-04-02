@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "base64 testPayload.json > encodedTestPayload && aws lambda invoke --function-name getPubmedArticles --payload file://encodedTestPayload --no-cli-auto-prompt  outfile.js && cat outfile.js | cut -c -500",
+    "update": "zip -r function.zip index.js node_modules/ && aws lambda update-function-code --no-cli-auto-prompt --function-name getPubmedArticles --zip-file fileb://function.zip && sleep 10s && npm test"
   },
   "author": "",
   "license": "ISC",
