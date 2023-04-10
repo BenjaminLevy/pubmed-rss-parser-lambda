@@ -63,7 +63,7 @@ class Article{
       const idWithoutIdentifier = fullId.slice(identifier.length + 1)
       return idWithoutIdentifier
     } catch {
-      return undefined
+      return "none"
     }
   }
 }
