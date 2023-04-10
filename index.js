@@ -58,9 +58,13 @@ class Article{
     this.authorsArr = data['dc:creator']
   }
   getId(sourceArr, identifier){
+    try{
       const fullId = sourceArr.find(a => a.startsWith(identifier))
       const idWithoutIdentifier = fullId.slice(identifier.length + 1)
       return idWithoutIdentifier
+    } catch {
+      return undefined
+    }
   }
 }
 
