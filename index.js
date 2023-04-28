@@ -11,15 +11,20 @@ const { parse } = require('path');
  */
 exports.handler = (event, context, callback) => {
 https.get(event['sort-key']["S"], (res) => {
-  console.log('statusCode:', res.statusCode);
-  console.log('headers:', res.headers);
   let rawData = '';
   res.on('data', (d) => {
     rawData += d;
   });
    res.on('end', () => {
+      const rawServerChannelMap = event["serverIdToChannelMap"]["M"]
       const articlesArr = parseXML(rawData)
-      callback(null, articlesArr);
+      const serverChannelMap = parseServerChannelMap(rawServerChannelMap)
+      const retObj = {
+        serverIdToChannelMap: serverChannelMap, 
+        articles: articlesArr
+
+      }
+      callback(null, retObj);
   });
 
 }).on('error', (e) => {
@@ -28,6 +33,18 @@ https.get(event['sort-key']["S"], (res) => {
 
 };
 
+// this function is necessary to eliminate the cumbersome "AttributeValue"
+// keys (i.e. types). 
+// E.g. here's how "subscribers" looks before being parsed by this function:
+// "31049823059721":{"S":"23023094823"},"3405920983094":{"S":"340235"}
+// and after:
+// "31049823059721":"23023094823","3405920983094":"340235"}
+function parseServerChannelMap(rawSubscribers){
+  for(const key in rawSubscribers){
+   rawSubscribers[key] = rawSubscribers[key]["S"] 
+  }
+  return rawSubscribers
+}
 
 function parseXML(data){
   const options = {
@@ -41,7 +58,11 @@ function parseXML(data){
   const fullParsedData = parser.parse(data)
   //return fullParsedData[0].rss[0]
   const rawArticlesArr = fullParsedData.rss.channel.item
-  rawArticlesArr.forEach((a) => resArr.push(new Article(a)))
+  rawArticlesArr.forEach((a) => {
+    if(!articleSeenBefore(a)){
+      resArr.push(new Article(a))
+    }
+  })
   return resArr
   
 }
@@ -49,13 +70,13 @@ function parseXML(data){
 class Article{
   constructor(data){
     this.title = data.title
-    this.url = data.link
     this.description = data.description
-    this.pmid = this.getId(data['dc:identifier'], "pmid")
-    this.doi = this.getId(data['dc:identifier'], 'doi')
-    this.date = data['dc:date']
-    this.journal = data['dc:source']
-    this.authorsArr = data['dc:creator']
+    this.author = { name: this.getAuthorString(data['dc:creator']) }
+    let pmid = this.getId(data['dc:identifier'], "pmid")
+    this.url = `https://pubmed.ncbi.nlm.nih.gov/${pmid}`
+    // this.doi = this.getId(data['dc:identifier'], 'doi')
+    // this.date = data['dc:date']
+    // this.journal = data['dc:source']
   }
   getId(sourceArr, identifier){
     try{
@@ -63,7 +84,25 @@ class Article{
       const idWithoutIdentifier = fullId.slice(identifier.length + 1)
       return idWithoutIdentifier
     } catch {
-      return "none"
+      return "unknown"
+    }
+  }
+  getAuthorString(authorsArray){
+    let authorsString
+    try{
+      if(authorsArray.length == 1){
+       authorsString = authorsArray[0]
+      }
+      else if (authorsArray.length == 2){
+       authorsString = `${authorsArray[0]} & ${authorsArray[1]}`
+      }
+      else authorsString = `${authorsArray[0]} et al.`
+    }
+    catch {
+      authorsString = "unknown"
+    }
+    finally {
+      return authorsString
     }
   }
 }

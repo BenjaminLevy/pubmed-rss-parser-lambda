@@ -1,5 +1,21 @@
 {
-	"sort-key": {
-		"S": "https://pubmed.ncbi.nlm.nih.gov/rss/search/1N3QNDYjRmvlmGgXS11a19lST_ktMjuMhSzQ2Xsk6Z3eI4rsvN/?limit=200&utm_campaign=pubmed-2&fc=20230119210020"
-	}
+    "resource-name": {
+      "S": "pubmedRSS"
+    },
+    "sort-key": {
+      "S": "https://pubmed.ncbi.nlm.nih.gov/rss/search/1xy-1_DjTDyc-xBRi_C2XuKVRuv5D3GDrM3NWld3OHQ9TsNkvl/?limit=20&utm_campaign=pubmed-2&fc=20230220161635"
+    },
+    "pubmedSearchQuery": {
+      "S": "this is where the rss search query goes"
+    },
+    "serverIdToChannelMap": {
+      "M": {
+        "1051660498149585048": {
+          "S": "1100818369000767568"
+        },
+        "803429347750576138": {
+          "S": "1077344605688823869"
+        }
+      }
+    }
 }
