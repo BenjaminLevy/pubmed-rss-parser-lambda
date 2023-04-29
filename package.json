@@ -4,17 +4,21 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "prebuild": "rm -rf dist",
+    "build": "esbuild index.ts --bundle --minify --sourcemap --platform=node --target=es2020 --outfile=dist/index.js",
+    "postbuild": "cd dist && zip -r index.zip index.js*",
     "test": "base64 testPayload.json > encodedTestPayload && aws lambda invoke --function-name getPubmedArticles --payload file://encodedTestPayload --no-cli-auto-prompt  outfile.js && cat outfile.js | cut -c -500",
-    "upload": "zip -r function.zip index.js node_modules/ && aws lambda update-function-code --no-cli-auto-prompt --function-name getPubmedArticles --zip-file fileb://function.zip && sleep 10s && npm test",
+    "upload": "npm run build && aws lambda update-function-code --no-cli-auto-prompt --function-name getPubmedArticles --zip-file fileb://dist/index.zip && sleep 10s && npm test",
     "view": "jq \".\" outfile.js | less"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.321.1",
+    "@aws-sdk/lib-dynamodb": "^3.321.1",
     "fast-xml-parser": "^4.1.3"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.114",
     "@types/node": "^18.16.2",
     "esbuild": "^0.17.18",
     "typescript": "^5.0.4"
