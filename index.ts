@@ -1,9 +1,10 @@
 import { Handler, Context} from 'aws-lambda';
 import { DynamoDBClient, ListTablesCommand, GetItemCommand, BatchGetItemCommand, BatchGetItemInput, KeysAndAttributes, BatchGetItemCommandOutput, BatchGetItemCommandInput} from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, BatchGetCommand, BatchGetCommandInput, BatchGetCommandOutput, Query } from "@aws-sdk/lib-dynamodb"; // ES6 import
-
+import { articleSeenBefore } from './libs/articleSeenBefore'
+import { SQS, SendMessageBatchCommand, SendMessageBatchCommandInput } from "@aws-sdk/client-sqs"
 const https = require('https');
-const { XMLParser } = require("fast-xml-parser");
+const { XMLParser } = require('fast-xml-parser');
 const { parse } = require('path');
 
 /**
@@ -21,10 +22,10 @@ https.get(event['sort-key']["S"], (res) => {
   });
    res.on('end', () => {
       const rawServerChannelMap = event["serverIdToChannelMap"]["M"]
-      const articlesArr = parseXML(rawData)
-      callback(null, articlesArr) 
-     // const articlesToSkipMap = articleSeenBefore(articlesArr)
       const serverChannelMap = parseServerChannelMap(rawServerChannelMap)
+      const articlesArr = parseXML(rawData)
+      const  articlesSeenInDB = articleSeenBefore(articlesArr)
+      enqueAndRecordArticleInDB(articlesArr, articlesSeenInDB, serverChannelMap)
       // const retObj = {
       //   serverIdToChannelMap: serverChannelMap, 
       //   articles: articlesArr
@@ -41,6 +42,28 @@ https.get(event['sort-key']["S"], (res) => {
 
 };
 
+function enqueAndRecordArticleInDB(articlesArr, articlesSeenInDB, serverChannelMap){
+    const unqueuedArticlesArr = articlesArr.filter((article: Article) => {
+        return articlesSeenInDB[article.id] != true
+      })
+
+    const length = unqueuedArticlesArr.length
+    let i: number = 0
+    while(i < length){
+      let j = i + 9
+      let slice = unqueuedArticlesArr.slice(i,j)
+      let sendMessageBatchEntries = []
+      slice.forEach((item) => {
+        sendMessageBatchEntries.push(
+          {
+            Id: Math.floor(Math.random() * 10),
+            MessageBody: item
+          }
+        )
+      })
+      i = j
+    } 
+}
 // this function is necessary to eliminate the cumbersome "AttributeValue"
 // keys (i.e. types). 
 // E.g. here's how "subscribers" looks before being parsed by this function:
@@ -54,7 +77,7 @@ function parseServerChannelMap(rawSubscribers){
   return rawSubscribers
 }
 
-function parseXML(data){
+function parseXML(data): Article[]{
   const options = {
   //preserveOrder:true,
   ignoreAttributes:true,
@@ -73,6 +96,14 @@ function parseXML(data){
 
 
 class Article{
+    readonly title: string;
+    readonly description: string;
+    readonly author: any;
+    readonly pmid: string;
+    readonly url: string;
+    readonly doi: string;
+    readonly id: string;
+
   constructor(data){
     this.title = data.title
     this.description = data.description
@@ -80,6 +111,7 @@ class Article{
     this.pmid = this.getId(data['dc:identifier'], "pmid")
     this.url = `https://pubmed.ncbi.nlm.nih.gov/${this.pmid}`
     this.doi = this.getId(data['dc:identifier'], 'doi')
+    this.id = this.doi? this.doi : this.pmid
     // this.date = data['dc:date']
     // this.journal = data['dc:source']
   }
@@ -92,8 +124,8 @@ class Article{
       return undefined
     }
   }
-  getAuthorString(authorsArray){
-    let authorsString
+  getAuthorString(authorsArray): string{
+    let authorsString: string
     try{
       if(authorsArray.length == 1){
        authorsString = authorsArray[0]
