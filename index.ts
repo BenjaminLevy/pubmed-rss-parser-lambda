@@ -2,7 +2,7 @@ import { Handler, Context} from 'aws-lambda';
 import { DynamoDBClient, ListTablesCommand, GetItemCommand, BatchGetItemCommand, BatchGetItemInput, KeysAndAttributes, BatchGetItemCommandOutput, BatchGetItemCommandInput} from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, BatchGetCommand, BatchGetCommandInput, BatchGetCommandOutput, Query } from "@aws-sdk/lib-dynamodb"; // ES6 import
 import { articleSeenBefore } from './libs/articleSeenBefore'
-import { SQS, SendMessageBatchCommand, SendMessageBatchCommandInput } from "@aws-sdk/client-sqs"
+import { SQS, SendMessageBatchCommand, SendMessageCommand, SendMessageBatchCommandInput } from "@aws-sdk/client-sqs"
 const https = require('https');
 const { XMLParser } = require('fast-xml-parser');
 const { parse } = require('path');
@@ -14,18 +14,19 @@ const { parse } = require('path');
  *
  * Will succeed with the response body.
  */
-exports.handler = (event, context, callback) => {
+exports.handler = async (event, context, callback) => {
 https.get(event['sort-key']["S"], (res) => {
   let rawData = '';
   res.on('data', (d) => {
     rawData += d;
   });
    res.on('end', () => {
+      return const articlesArr = parseXML(rawData)
       const rawServerChannelMap = event["serverIdToChannelMap"]["M"]
       const serverChannelMap = parseServerChannelMap(rawServerChannelMap)
       const articlesArr = parseXML(rawData)
       const  articlesSeenInDB = articleSeenBefore(articlesArr)
-      enqueAndRecordArticleInDB(articlesArr, articlesSeenInDB, serverChannelMap)
+      await enqueAndRecordArticleInDB(articlesarr, articlesseenindb, serverchannelmap)
       // const retObj = {
       //   serverIdToChannelMap: serverChannelMap, 
       //   articles: articlesArr
@@ -42,7 +43,30 @@ https.get(event['sort-key']["S"], (res) => {
 
 };
 
+const client = new SQSClient(config);
+
+const QUEUE_URL =  
+
+const input = { // SendMessageRequest
+  QueueUrl: QUEUE_URL // required
+  MessageBody: "STRING_VALUE", // required
+  DelaySeconds: Number("int"),
+  MessageAttributes: { // MessageBodyAttributeMap
+    "<keys>": { // MessageAttributeValue
+      StringValue: "STRING_VALUE",
+      BinaryValue: "BLOB_VALUE",
+      DataType: "STRING_VALUE", // required
+    },
+  },
+  MessageSystemAttributes: { // MessageBodySystemAttributeMap
+      DataType: "STRING_VALUE", // required
+    },
+  },
+};
+const command = new SendMessageCommand(input);
+const response = await client.send(command);
 function enqueAndRecordArticleInDB(articlesArr, articlesSeenInDB, serverChannelMap){
+  return Promise.resolve("hello")
     const unqueuedArticlesArr = articlesArr.filter((article: Article) => {
         return articlesSeenInDB[article.id] != true
       })
@@ -52,15 +76,9 @@ function enqueAndRecordArticleInDB(articlesArr, articlesSeenInDB, serverChannelM
     while(i < length){
       let j = i + 9
       let slice = unqueuedArticlesArr.slice(i,j)
-      let sendMessageBatchEntries = []
-      slice.forEach((item) => {
-        sendMessageBatchEntries.push(
-          {
-            Id: Math.floor(Math.random() * 10),
-            MessageBody: item
-          }
-        )
-      })
+      let sendMessageString = ""
+      slice.forEach((item: Article) => { sendMessageString += item })
+      
       i = j
     } 
 }
