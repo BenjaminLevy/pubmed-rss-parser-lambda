@@ -1,8 +1,10 @@
 import { Handler, Context} from 'aws-lambda';
 import { DynamoDBClient, ListTablesCommand, GetItemCommand, BatchGetItemCommand, BatchGetItemInput, KeysAndAttributes, BatchGetItemCommandOutput, BatchGetItemCommandInput} from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, BatchGetCommand, BatchGetCommandInput, BatchGetCommandOutput, Query } from "@aws-sdk/lib-dynamodb"; // ES6 import
-import { articleSeenBefore } from './libs/articleSeenBefore'
 import { SQS, SendMessageBatchCommand, SendMessageCommand, SendMessageBatchCommandInput } from "@aws-sdk/client-sqs"
+import { ClientRequest } from 'http';
+import { articleSeenBefore } from './libs/articleSeenBefore'
+import { makeGetRequest } from './libs/makeGetRequest'
 const https = require('https');
 const { XMLParser } = require('fast-xml-parser');
 const { parse } = require('path');
@@ -15,58 +17,83 @@ const { parse } = require('path');
  * Will succeed with the response body.
  */
 exports.handler = async (event, context, callback) => {
-https.get(event['sort-key']["S"], (res) => {
-  let rawData = '';
-  res.on('data', (d) => {
-    rawData += d;
-  });
-   res.on('end', () => {
-      return const articlesArr = parseXML(rawData)
-      const rawServerChannelMap = event["serverIdToChannelMap"]["M"]
-      const serverChannelMap = parseServerChannelMap(rawServerChannelMap)
-      const articlesArr = parseXML(rawData)
-      const  articlesSeenInDB = articleSeenBefore(articlesArr)
-      await enqueAndRecordArticleInDB(articlesarr, articlesseenindb, serverchannelmap)
-      // const retObj = {
-      //   serverIdToChannelMap: serverChannelMap, 
-      //   articles: articlesArr
-      // }
-      // callback(null, {
-      //   "articlesToSkipMap": articlesToSkipMap,
-      //   "retObj": retObj
-      // });
-  });
+  
+makeGetRequest(event)
+function getArticlesArr(): Promise<Notice[]> {
+    const timeout = 10000;
+    return new Promise((resolve, reject) => {
+      let req: ClientRequest | undefined;
 
-}).on('error', (e) => {
-  callback(e);
-});
+      let timer = setTimeout(() => {
+        if (req) {
+          req.destroy(new Error('Request timed out'));
+        }
+      }, timeout);
 
-};
+      timer.unref();
 
-const client = new SQSClient(config);
+      try {
+        req = https.get('https://cli.cdk.dev-tools.aws.dev/notices.json',
+          res => {
+            if (res.statusCode === 200) {
+              res.setEncoding('utf8');
+              let rawData = '';
+              res.on('data', (chunk) => {
+                rawData += chunk;
+              });
+              res.on('end', () => {
+                try {
+                  const data = JSON.parse(rawData).notices as Notice[];
+                  if (!data) {
+                    throw new Error("'notices' key is missing");
+                  }
+                  debug('Notices refreshed');
+                  resolve(data ?? []);
+                } catch (e: any) {
+                  reject(new Error(`Failed to parse notices: ${e.message}`));
+                }
+              });
+              res.on('error', e => {
+                reject(new Error(`Failed to fetch notices: ${e.message}`));
+              });
+            } else {
+              reject(new Error(`Failed to fetch notices. Status code: ${res.statusCode}`));
+            }
+          });
+        req.on('error', reject);
+      } catch (e: any) {
+        reject(new Error(`HTTPS 'get' call threw an error: ${e.message}`));
+      }
+    });
+  }
+}
+// const client = new SQSClient(config);
+//
+// const QUEUE_URL = 
 
-const QUEUE_URL =  
-
-const input = { // SendMessageRequest
-  QueueUrl: QUEUE_URL // required
-  MessageBody: "STRING_VALUE", // required
-  DelaySeconds: Number("int"),
-  MessageAttributes: { // MessageBodyAttributeMap
-    "<keys>": { // MessageAttributeValue
-      StringValue: "STRING_VALUE",
-      BinaryValue: "BLOB_VALUE",
-      DataType: "STRING_VALUE", // required
-    },
-  },
-  MessageSystemAttributes: { // MessageBodySystemAttributeMap
-      DataType: "STRING_VALUE", // required
-    },
-  },
-};
-const command = new SendMessageCommand(input);
-const response = await client.send(command);
+// const input = { // SendMessageRequest
+//   QueueUrl: QUEUE_URL // required
+//   MessageBody: "STRING_VALUE", // required
+//   DelaySeconds: Number("int"),
+//   MessageAttributes: { // MessageBodyAttributeMap
+//     "<keys>": { // MessageAttributeValue
+//       StringValue: "STRING_VALUE",
+//       BinaryValue: "BLOB_VALUE",
+//       DataType: "STRING_VALUE", // required
+//     },
+//   },
+//   MessageSystemAttributes: { // MessageBodySystemAttributeMap
+//       DataType: "STRING_VALUE", // required
+//     },
+//   },
+// };
+// const command = new SendMessageCommand(input);
+// const response = await client.send(command);
+// 
+//
+//
+// uncomment after test ^^^
 function enqueAndRecordArticleInDB(articlesArr, articlesSeenInDB, serverChannelMap){
-  return Promise.resolve("hello")
     const unqueuedArticlesArr = articlesArr.filter((article: Article) => {
         return articlesSeenInDB[article.id] != true
       })
