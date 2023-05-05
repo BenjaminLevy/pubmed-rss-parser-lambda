@@ -9,7 +9,7 @@
     "build": "esbuild index.ts --bundle --minify --sourcemap --platform=node --target=es2020 --outfile=dist/index.js",
     "postbuild": "cd dist && zip -r index.zip index.js*",
     "test-remote": "base64 testPayload.json > encodedTestPayload && aws lambda invoke --function-name getPubmedArticles --payload file://encodedTestPayload --no-cli-auto-prompt  outfile.js && cat outfile.js | cut -c -500",
-    "upload": "npm run build && aws lambda update-function-code --no-cli-auto-prompt --function-name getPubmedArticles --zip-file fileb://dist/index.zip && sleep 10s && npm test-remote",
+    "upload": "npm run build && aws lambda update-function-code --no-cli-auto-prompt --function-name getPubmedArticles --zip-file fileb://dist/index.zip && sleep 10s && npm run test-remote",
     "view": "jq \".\" outfile.js | less"
   },
   "author": "",

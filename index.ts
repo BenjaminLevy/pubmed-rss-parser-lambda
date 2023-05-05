@@ -9,63 +9,14 @@ const https = require('https');
 const { XMLParser } = require('fast-xml-parser');
 const { parse } = require('path');
 
-/**
- * Pass the data to send as `event.data`, and the request options as
- * `event.options`. For more information see the HTTPS module documentation
- * at https://nodejs.org/api/https.html.
- *
- * Will succeed with the response body.
- */
 exports.handler = async (event, context, callback) => {
-  
-makeGetRequest(event)
-function getArticlesArr(): Promise<Notice[]> {
-    const timeout = 10000;
-    return new Promise((resolve, reject) => {
-      let req: ClientRequest | undefined;
-
-      let timer = setTimeout(() => {
-        if (req) {
-          req.destroy(new Error('Request timed out'));
-        }
-      }, timeout);
-
-      timer.unref();
-
-      try {
-        req = https.get('https://cli.cdk.dev-tools.aws.dev/notices.json',
-          res => {
-            if (res.statusCode === 200) {
-              res.setEncoding('utf8');
-              let rawData = '';
-              res.on('data', (chunk) => {
-                rawData += chunk;
-              });
-              res.on('end', () => {
-                try {
-                  const data = JSON.parse(rawData).notices as Notice[];
-                  if (!data) {
-                    throw new Error("'notices' key is missing");
-                  }
-                  debug('Notices refreshed');
-                  resolve(data ?? []);
-                } catch (e: any) {
-                  reject(new Error(`Failed to parse notices: ${e.message}`));
-                }
-              });
-              res.on('error', e => {
-                reject(new Error(`Failed to fetch notices: ${e.message}`));
-              });
-            } else {
-              reject(new Error(`Failed to fetch notices. Status code: ${res.statusCode}`));
-            }
-          });
-        req.on('error', reject);
-      } catch (e: any) {
-        reject(new Error(`HTTPS 'get' call threw an error: ${e.message}`));
-      }
-    });
-  }
+  const url = event['sort-key']["S"]
+  const httpResponse = await makeGetRequest(url)
+  const articlesArr = parseXML(httpResponse)
+  const articlesSeenBeforeMap = await articleSeenBefore(articlesArr)
+  const rawServerChannelMap = event["serverIdToChannelMap"]["M"]
+  const serverChannelMap = parseServerChannelMap(rawServerChannelMap)
+  await enqueAndRecordArticleInDB(articlesArr, articlesSeenBeforeMap, serverChannelMap)
 }
 // const client = new SQSClient(config);
 //
@@ -93,9 +44,10 @@ function getArticlesArr(): Promise<Notice[]> {
 //
 //
 // uncomment after test ^^^
+//
 function enqueAndRecordArticleInDB(articlesArr, articlesSeenInDB, serverChannelMap){
     const unqueuedArticlesArr = articlesArr.filter((article: Article) => {
-        return articlesSeenInDB[article.id] != true
+        return articlesSeenInDB[article.sortKey] != true
       })
 
     const length = unqueuedArticlesArr.length
@@ -147,7 +99,7 @@ class Article{
     readonly pmid: string;
     readonly url: string;
     readonly doi: string;
-    readonly id: string;
+    readonly sortKey: string;
 
   constructor(data){
     this.title = data.title
@@ -156,7 +108,7 @@ class Article{
     this.pmid = this.getId(data['dc:identifier'], "pmid")
     this.url = `https://pubmed.ncbi.nlm.nih.gov/${this.pmid}`
     this.doi = this.getId(data['dc:identifier'], 'doi')
-    this.id = this.doi? this.doi : this.pmid
+    this.sortKey = this.doi? this.doi : this.pmid
     // this.date = data['dc:date']
     // this.journal = data['dc:source']
   }
@@ -188,4 +140,3 @@ class Article{
     }
   }
 }
-

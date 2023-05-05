@@ -1,8 +1,9 @@
 import * as https from 'https';
 
-export async function makeGetRequest(event){ 
+export async function makeGetRequest(url: string){ 
   return new Promise((resolve, reject) => {
-  https.get(event['sort-key']["S"], (res) => {
+  https.get(url, (res) => {
+    if(res.statusCode === 400){
       let rawData = '';
       res.on('data', (d) => {
         rawData += d;
@@ -18,7 +19,10 @@ export async function makeGetRequest(event){
           //   "retObj": retObj
           // });
       });
-    })
+    } else {
+        reject(new Error(`Failed to fetch notices. Status code: ${res.statusCode}`))
+    }
+  })
     .on('error', (e) => {
       reject(e)
   });
@@ -29,9 +33,3 @@ export async function makeGetRequest(event){
   // await enqueAndRecordArticleInDB(articlesarr, articlesseenindb, serverchannelmap)
 });
 }
-let eventJson = {
-"sort-key": { "S": "reddit.com"}
-}
-makeGetRequest(eventJson)
-.then(result => console.log(result))
-.catch(error => console.log("yeet", error.name))
