@@ -3,7 +3,7 @@ import * as https from 'https';
 export async function makeGetRequest(url: string){ 
   return new Promise((resolve, reject) => {
   https.get(url, (res) => {
-    if(res.statusCode === 400){
+    if(res.statusCode === 200){
       let rawData = '';
       res.on('data', (d) => {
         rawData += d;

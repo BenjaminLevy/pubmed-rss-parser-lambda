@@ -13,60 +13,39 @@ exports.handler = async (event, context, callback) => {
   const url = event['sort-key']["S"]
   const httpResponse = await makeGetRequest(url)
   const articlesArr = parseXML(httpResponse)
-  const articlesSeenBeforeMap = await articleSeenBefore(articlesArr)
   const rawServerChannelMap = event["serverIdToChannelMap"]["M"]
   const serverChannelMap = parseServerChannelMap(rawServerChannelMap)
-  await enqueAndRecordArticleInDB(articlesArr, articlesSeenBeforeMap, serverChannelMap)
-}
-// const client = new SQSClient(config);
-//
-// const QUEUE_URL = 
-
-// const input = { // SendMessageRequest
-//   QueueUrl: QUEUE_URL // required
-//   MessageBody: "STRING_VALUE", // required
-//   DelaySeconds: Number("int"),
-//   MessageAttributes: { // MessageBodyAttributeMap
-//     "<keys>": { // MessageAttributeValue
-//       StringValue: "STRING_VALUE",
-//       BinaryValue: "BLOB_VALUE",
-//       DataType: "STRING_VALUE", // required
-//     },
-//   },
-//   MessageSystemAttributes: { // MessageBodySystemAttributeMap
-//       DataType: "STRING_VALUE", // required
-//     },
-//   },
-// };
-// const command = new SendMessageCommand(input);
-// const response = await client.send(command);
-// 
-//
-//
-// uncomment after test ^^^
-//
-function enqueAndRecordArticleInDB(articlesArr, articlesSeenInDB, serverChannelMap){
-    const unqueuedArticlesArr = articlesArr.filter((article: Article) => {
-        return articlesSeenInDB[article.sortKey] != true
+  const articlesSeenBeforeMap = await articleSeenBefore(articlesArr)
+  // filter out the articles which have been seen before
+  const unqueuedArticlesArr = articlesArr.filter((article: Article) => {
+        return articlesSeenBeforeMap[article.sortKey] != true
       })
+  await enqueArticles(articlesArr, serverChannelMap)
+}
 
-    const length = unqueuedArticlesArr.length
+async function enqueArticles(articlesArr, serverChannelMap){
+  return new Promise((resolve, reject) => {
+    const length = articlesArr.length
     let i: number = 0
     while(i < length){
       let j = i + 9
-      let slice = unqueuedArticlesArr.slice(i,j)
+      let slice = articlesArr.slice(i,j)
       let sendMessageString = ""
       slice.forEach((item: Article) => { sendMessageString += item })
-      
+      console.log(slice)  
       i = j
     } 
+    resolve("complete")
+  })
 }
+
 // this function is necessary to eliminate the cumbersome "AttributeValue"
 // keys (i.e. types). 
 // E.g. here's how "subscribers" looks before being parsed by this function:
 // "31049823059721":{"S":"23023094823"},"3405920983094":{"S":"340235"}
 // and after:
 // "31049823059721":"23023094823","3405920983094":"340235"}
+
 function parseServerChannelMap(rawSubscribers){
   for(const key in rawSubscribers){
    rawSubscribers[key] = rawSubscribers[key]["S"] 
