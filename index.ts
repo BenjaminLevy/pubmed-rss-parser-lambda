@@ -5,6 +5,8 @@ import { SQS, SendMessageBatchCommand, SendMessageCommand, SendMessageBatchComma
 import { ClientRequest } from 'http';
 import { articleSeenBefore } from './libs/articleSeenBefore'
 import { makeGetRequest } from './libs/makeGetRequest'
+import { Article } from './libs/article'
+import { enqueArticles } from './libs/enqueArticles'
 const https = require('https');
 const { XMLParser } = require('fast-xml-parser');
 const { parse } = require('path');
@@ -20,24 +22,28 @@ exports.handler = async (event, context, callback) => {
   const unqueuedArticlesArr = articlesArr.filter((article: Article) => {
         return articlesSeenBeforeMap[article.sortKey] != true
       })
-  await enqueArticles(articlesArr, serverChannelMap)
+  const discordEmbedsArr = unqueuedArticlesArr.map((article) => {
+    article.toEmbed()
+  })
+  const enqueRes = await enqueArticles(discordEmbedsArr, serverChannelMap)
+  return enqueRes
 }
 
-async function enqueArticles(articlesArr, serverChannelMap){
-  return new Promise((resolve, reject) => {
-    const length = articlesArr.length
-    let i: number = 0
-    while(i < length){
-      let j = i + 9
-      let slice = articlesArr.slice(i,j)
-      let sendMessageString = ""
-      slice.forEach((item: Article) => { sendMessageString += item })
-      console.log(slice)  
-      i = j
-    } 
-    resolve("complete")
-  })
-}
+// async function enqueArticles(articlesArr, serverChannelMap){
+//   return new Promise((resolve, reject) => {
+//     const length = articlesArr.length
+//     let i: number = 0
+//     while(i < length){
+//       let j = i + 9
+//       let slice = articlesArr.slice(i,j)
+//       let sendMessageString = ""
+//       slice.forEach((item: Article) => { sendMessageString += item })
+//       console.log(slice)  
+//       i = j
+//     } 
+//     resolve("complete")
+//   })
+// }
 
 // this function is necessary to eliminate the cumbersome "AttributeValue"
 // keys (i.e. types). 
@@ -71,51 +77,3 @@ function parseXML(data): Article[]{
 }
 
 
-class Article{
-    readonly title: string;
-    readonly description: string;
-    readonly author: any;
-    readonly pmid: string;
-    readonly url: string;
-    readonly doi: string;
-    readonly sortKey: string;
-
-  constructor(data){
-    this.title = data.title
-    this.description = data.description
-    this.author = { name: this.getAuthorString(data['dc:creator']) }
-    this.pmid = this.getId(data['dc:identifier'], "pmid")
-    this.url = `https://pubmed.ncbi.nlm.nih.gov/${this.pmid}`
-    this.doi = this.getId(data['dc:identifier'], 'doi')
-    this.sortKey = this.doi? this.doi : this.pmid
-    // this.date = data['dc:date']
-    // this.journal = data['dc:source']
-  }
-  getId(sourceArr, identifier){
-    try{
-      const fullId = sourceArr.find(a => a.startsWith(identifier))
-      const idWithoutIdentifier = fullId.slice(identifier.length + 1)
-      return idWithoutIdentifier
-    } catch {
-      return undefined
-    }
-  }
-  getAuthorString(authorsArray): string{
-    let authorsString: string
-    try{
-      if(authorsArray.length == 1){
-       authorsString = authorsArray[0]
-      }
-      else if (authorsArray.length == 2){
-       authorsString = `${authorsArray[0]} & ${authorsArray[1]}`
-      }
-      else authorsString = `${authorsArray[0]} et al.`
-    }
-    catch {
-      authorsString = "unknown"
-    }
-    finally {
-      return authorsString
-    }
-  }
-}
