@@ -12,18 +12,20 @@ const { XMLParser } = require('fast-xml-parser');
 const { parse } = require('path');
 
 exports.handler = async (event, context, callback) => {
-  const url = event['sort-key']["S"]
-  const httpResponse = await makeGetRequest(url)
-  const articlesArr = parseXML(httpResponse)
   const rawServerChannelMap = event["serverIdToChannelMap"]["M"]
   const serverChannelMap = parseServerChannelMap(rawServerChannelMap)
+
+  const url = event['sort-key']["S"]
+  const httpResponse = await makeGetRequest(url)
+  const articlesArr: Article[] = parseXML(httpResponse)
   const articlesSeenBeforeMap = await articleSeenBefore(articlesArr)
   // filter out the articles which have been seen before
   const unqueuedArticlesArr = articlesArr.filter((article: Article) => {
         return articlesSeenBeforeMap[article.sortKey] != true
       })
-  const discordEmbedsArr = unqueuedArticlesArr.map((article) => {
-    article.toEmbed()
+  const discordEmbedsArr = [] 
+  unqueuedArticlesArr.forEach((article) => {
+    discordEmbedsArr.push(article.toEmbed())
   })
   const enqueRes = await enqueArticles(discordEmbedsArr, serverChannelMap)
   return enqueRes
@@ -71,7 +73,12 @@ function parseXML(data): Article[]{
   const fullParsedData = parser.parse(data)
   //return fullParsedData[0].rss[0]
   const rawArticlesArr = fullParsedData.rss.channel.item
-  rawArticlesArr.forEach((a) => resArr.push(new Article(a)))
+  rawArticlesArr.forEach((a) => {
+    let article = new Article(a)
+    if(article.sortKey !== undefined){
+      resArr.push(article)
+    }
+  })
   return resArr
   
 }

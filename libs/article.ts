@@ -10,7 +10,7 @@ export class Article{
   constructor(data){
     this.title = data.title
     this.description = data.description
-    this.author = { name: this.getAuthorString(data['dc:creator']) }
+    this.author = this.getAuthorString(data['dc:creator'])
     this.pmid = this.getId(data['dc:identifier'], "pmid")
     this.url = `https://pubmed.ncbi.nlm.nih.gov/${this.pmid}`
     this.doi = this.getId(data['dc:identifier'], 'doi')
@@ -38,7 +38,8 @@ export class Article{
       }
       else authorsString = `${authorsArray[0]} et al.`
     }
-    catch {
+    catch(e) {
+      console.log(e)
       authorsString = "unknown"
     }
     finally {
@@ -46,14 +47,14 @@ export class Article{
     }
   }
   toEmbed(){
-    return {
+    return JSON.stringify({
       title: this.title,
       description: this.description,
       author: {
         name: this.author
       },
       url: this.url
-    }
+    })
   }
 }
 

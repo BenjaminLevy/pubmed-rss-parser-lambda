@@ -40,7 +40,9 @@ export async function articleSeenBefore(articlesArr){
     },
     ReturnConsumedCapacity: "NONE"
   }
+
   let testInput = new BatchGetCommand(batchInputForDocClient)
+  // TODO let sortKeyToRSSArticleMap = {}
   const results = await client.send(testInput);
   let resWithoutMetadata = results.Responses[TABLE_NAME]// removing this for now to see the metadata while debugging
   let mapOfPreviouslySeenIds = {}

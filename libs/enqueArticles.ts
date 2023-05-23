@@ -11,25 +11,35 @@ export async function enqueArticles(articlesArr, serverChannelMap){
     while(i < length){
       let j = i + 10
       let slice = articlesArr.slice(i,j)
-      let sendMessageString = ""
       let sendMessageArray = []
       slice.forEach((item: any) => { sendMessageArray.push(item) })
-
-      res = await sqsClient.send(
-        new SendMessageCommand({
-          MessageBody: JSON.stringify(sendMessageArray),
-          QueueUrl: queueUrl,
-        })
-      )  
+      for(let server in serverChannelMap){
+        res = await sqsClient.send(
+          new SendMessageCommand({
+            MessageBody: JSON.stringify(sendMessageArray),
+            QueueUrl: queueUrl,
+            MessageAttributes:{ // MessageBodyAttributeMap
+              "server": { // MessageAttributeValue
+                StringValue: server,
+                DataType: "String", // required
+              },
+              "channel": { // MessageAttributeValue
+                StringValue: serverChannelMap[server],
+                DataType: "String", // required
+              }
+            }
+          })
+        )
+      }
+      i = j
+    }
 
       if (res.$metadata.httpStatusCode) {
         if (res.$metadata.httpStatusCode > 299) {
           throw new Error(`Failed to send sqs message metadata:${res.$metadata}`);
         }
       }
-      i = j
-    } 
-    return res.$metadata
+    return "success"
   }
   catch(e){
     throw e
