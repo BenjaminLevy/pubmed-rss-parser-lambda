@@ -47,14 +47,14 @@ export class Article{
     }
   }
   toEmbed(){
-    return JSON.stringify({
+    return {
       title: this.title,
       description: this.description,
       author: {
         name: this.author
       },
       url: this.url
-    })
+    }
   }
 }
 

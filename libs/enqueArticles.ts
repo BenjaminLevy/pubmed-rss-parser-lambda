@@ -14,9 +14,14 @@ export async function enqueArticles(articlesArr, serverChannelMap){
       let sendMessageArray = []
       slice.forEach((item: any) => { sendMessageArray.push(item) })
       for(let server in serverChannelMap){
+        let messageObjectWithServerAndChannel = {
+            embeds: sendMessageArray,
+            server: server,
+            channel: serverChannelMap[server]
+          }
         res = await sqsClient.send(
           new SendMessageCommand({
-            MessageBody: JSON.stringify(sendMessageArray),
+            MessageBody: JSON.stringify(messageObjectWithServerAndChannel),
             QueueUrl: queueUrl,
             MessageAttributes:{ // MessageBodyAttributeMap
               "server": { // MessageAttributeValue
