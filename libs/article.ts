@@ -46,23 +46,18 @@ export class Article{
       return authorsString
     }
   }
+
+  // "slice" used here to prevent fields from surpassing character limit, 
+  // which will cause the Discord API to reject the request. see:
+  // https://discord.com/developers/docs/resources/channel#embed-object-embed-limits
   toEmbed(){
     return {
-      title: this.title,
-      description: this.description,
+      title: this.title.slice(0, 256),
+      description: this.description.slice(0, 4096),
       author: {
-        name: this.author
+        name: this.author.slice(0, 256)
       },
       url: this.url
     }
   }
 }
-
-// {
-//       "title": "Aquablation Therapy in Large Prostates (80-150 mL) for Lower Urinary Tract Symptoms Due to Benign Prostatic Hyperplasia: Final WATER II 5-Year Clinical Trial Results",
-//       "description": "CONCLUSIONS: At 5-years of prospective follow-up, the Aquablation procedure was shown to be safe with durable efficacy and low rates of retreatment in men with large prostates (80-150 mL).",
-//       "author": {
-//         "name": "Naeem Bhojani et al."
-//       },
-//       "url": "https://pubmed.ncbi.nlm.nih.gov/37115632"
-//     },
